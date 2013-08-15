@@ -65,6 +65,9 @@
     
     _lowerValue = 0.0;
     _upperValue = 1.0;
+    
+    self.lowerHandle.hidden = YES;
+    self.lowerHandle.userInteractionEnabled = NO;
 }
 
 // ------------------------------------------------------------------------------------------------------
@@ -282,7 +285,8 @@
         retValue.size.height=self.bounds.size.height;
     }
 
-    float xLowerValue = ((self.bounds.size.width - _lowerHandle.frame.size.width) * (_lowerValue - _minimumValue) / (_maximumValue - _minimumValue))+(_lowerHandle.frame.size.width/2.0f);
+    //float xLowerValue = ((self.bounds.size.width - _lowerHandle.frame.size.width) * (_lowerValue - _minimumValue) / (_maximumValue - _minimumValue))+(_lowerHandle.frame.size.width/2.0f);
+    float xLowerValue = 1;
     float xUpperValue = ((self.bounds.size.width - _upperHandle.frame.size.width) * (_upperValue - _minimumValue) / (_maximumValue - _minimumValue))+(_upperHandle.frame.size.width/2.0f);
     
     retValue.origin = CGPointMake(xLowerValue, (self.bounds.size.height/2.0f) - (retValue.size.height/2.0f));
@@ -320,15 +324,15 @@
     UIEdgeInsets insets = thumbImage.capInsets;
 
     thumbRect.size = CGSizeMake(thumbImage.size.width, thumbImage.size.height);
-    
+
     if(insets.top || insets.bottom)
     {
         thumbRect.size.height=self.bounds.size.height;
     }
-    
+
     float xValue = ((self.bounds.size.width-thumbRect.size.width)*((value - _minimumValue) / (_maximumValue - _minimumValue)));
     thumbRect.origin = CGPointMake(xValue, (self.bounds.size.height/2.0f) - (thumbRect.size.height/2.0f));
-    
+   
     return CGRectIntegral(thumbRect);
 
 }
@@ -355,6 +359,9 @@
     // Lower Handle Handle
     self.lowerHandle = [[UIImageView alloc] initWithImage:self.lowerHandleImageNormal highlightedImage:self.lowerHandleImageHighlighted];
     self.lowerHandle.frame = [self thumbRectForValue:_lowerValue image:self.lowerHandleImageNormal];
+    
+    self.lowerHandle.hidden = YES;
+    self.lowerHandle.userInteractionEnabled = NO;
     
     //------------------------------
     // Upper Handle Handle

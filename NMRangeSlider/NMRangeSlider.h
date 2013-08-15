@@ -69,4 +69,6 @@
 
 - (void) setLowerValue:(float) lowerValue upperValue:(float) upperValue animated:(BOOL)animated;
 
+- (CGRect)thumbRectForValue:(float)value image:(UIImage*) thumbImage;
+
 @end
