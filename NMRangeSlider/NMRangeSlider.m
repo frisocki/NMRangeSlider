@@ -8,6 +8,21 @@
 
 #import "NMRangeSlider.h"
 
+
+#define IS_PRE_IOS7() (DeviceSystemMajorVersion() < 7)
+
+NSUInteger DeviceSystemMajorVersion() {
+    static NSUInteger _deviceSystemMajorVersion = -1;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        _deviceSystemMajorVersion = [[[[[UIDevice currentDevice] systemVersion]
+                                       componentsSeparatedByString:@"."] objectAtIndex:0] intValue];
+    });
+    return _deviceSystemMajorVersion;
+}
+
+
+
 @interface NMRangeSlider ()
 {
     float _lowerTouchOffset;
@@ -23,10 +38,20 @@
 
 @end
 
+
 @implementation NMRangeSlider
 
 #pragma mark -
 #pragma mark - Constructors
+
+- (id)init
+{
+    self = [super init];
+    if (self) {
+        [self configureView];
+    }
+    return self;
+}
 
 - (id)initWithFrame:(CGRect)frame
 {
@@ -63,11 +88,22 @@
     
     _continuous = YES;
     
-    _lowerValue = 0.0;
-    _upperValue = 1.0;
-    
     self.lowerHandle.hidden = YES;
     self.lowerHandle.userInteractionEnabled = NO;
+
+    _lowerValue = _minimumValue;
+    _upperValue = _maximumValue;
+    
+    _lowerMaximumValue = NAN;
+    _upperMinimumValue = NAN;
+    _upperHandleHidden = NO;
+    _lowerHandleHidden = NO;
+    
+    _lowerHandleHiddenWidth = 2.0f;
+    _upperHandleHiddenWidth = 2.0f;
+    
+    _lowerTouchEdgeInsets = UIEdgeInsetsMake(-5, -5, -5, -5);
+    _upperTouchEdgeInsets = UIEdgeInsetsMake(-5, -5, -5, -5);
 }
 
 // ------------------------------------------------------------------------------------------------------
@@ -94,7 +130,13 @@
         value = roundf(value / _stepValueInternal) * _stepValueInternal;
     }
     
+    value = MIN(value, _maximumValue);
     value = MAX(value, _minimumValue);
+    
+    if (!isnan(_lowerMaximumValue)) {
+        value = MIN(value, _lowerMaximumValue);
+    }
+    
     value = MIN(value, _upperValue - _minimumRange);
     
     _lowerValue = value;
@@ -111,7 +153,13 @@
         value = roundf(value / _stepValueInternal) * _stepValueInternal;
     }
 
+    value = MAX(value, _minimumValue);
     value = MIN(value, _maximumValue);
+    
+    if (!isnan(_upperMinimumValue)) {
+        value = MAX(value, _upperMinimumValue);
+    }
+    
     value = MAX(value, _lowerValue+_minimumRange);
     
     _upperValue = value;
@@ -171,15 +219,36 @@
     [self setLowerValue:NAN upperValue:upperValue animated:animated];
 }
 
+- (void) setLowerHandleHidden:(BOOL)lowerHandleHidden
+{
+    _lowerHandleHidden = lowerHandleHidden;
+    [self setNeedsLayout];
+}
+
+- (void) setUpperHandleHidden:(BOOL)upperHandleHidden
+{
+    _upperHandleHidden = upperHandleHidden;
+    [self setNeedsLayout];
+}
+
 //ON-Demand images. If the images are not set, then the default values are loaded.
 
 - (UIImage *)trackBackgroundImage
 {
     if(_trackBackgroundImage==nil)
     {
-        UIImage* image = [UIImage imageNamed:@"slider-default-trackBackground"];
-        image = [image resizableImageWithCapInsets:UIEdgeInsetsMake(0.0, 5.0, 0.0, 5.0)];
-        _trackBackgroundImage = image;
+        if(IS_PRE_IOS7())
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default-trackBackground"];
+            image = [image resizableImageWithCapInsets:UIEdgeInsetsMake(0.0, 5.0, 0.0, 5.0)];
+            _trackBackgroundImage = image;
+        }
+        else
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default7-trackBackground"];
+            image = [image resizableImageWithCapInsets:UIEdgeInsetsMake(0.0, 2.0, 0.0, 2.0)];
+            _trackBackgroundImage = image;
+        }
     }
     
     return _trackBackgroundImage;
@@ -189,20 +258,62 @@
 {
     if(_trackImage==nil)
     {
-        UIImage* image = [UIImage imageNamed:@"slider-default-track"];
-        image = [image resizableImageWithCapInsets:UIEdgeInsetsMake(0.0, 7.0, 0.0, 7.0)];
-        _trackImage = image;
+        if(IS_PRE_IOS7())
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default-track"];
+            image = [image resizableImageWithCapInsets:UIEdgeInsetsMake(0.0, 7.0, 0.0, 7.0)];
+            _trackImage = image;
+        }
+        else
+        {
+            
+            UIImage* image = [UIImage imageNamed:@"slider-default7-track"];
+            image = [image resizableImageWithCapInsets:UIEdgeInsetsMake(0.0, 2.0, 0.0, 2.0)];
+            image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            _trackImage = image;
+        }
     }
     
     return _trackImage;
+}
+
+
+- (UIImage *)trackCrossedOverImage
+{
+    if(_trackCrossedOverImage==nil)
+    {
+        if(IS_PRE_IOS7())
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default-trackCrossedOver"];
+            image = [image resizableImageWithCapInsets:UIEdgeInsetsMake(0.0, 7.0, 0.0, 7.0)];
+            _trackCrossedOverImage = image;
+        }
+        else
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default7-trackCrossedOver"];
+            image = [image resizableImageWithCapInsets:UIEdgeInsetsMake(0.0, 2.0, 0.0, 2.0)];
+            _trackCrossedOverImage = image;
+        }
+    }
+    
+    return _trackCrossedOverImage;
 }
 
 - (UIImage *)lowerHandleImageNormal
 {
     if(_lowerHandleImageNormal==nil)
     {
-        UIImage* image = [UIImage imageNamed:@"slider-default-handle"];
-        _lowerHandleImageNormal = image;
+        if(IS_PRE_IOS7())
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default-handle"];
+            _lowerHandleImageNormal = [image imageWithAlignmentRectInsets:UIEdgeInsetsMake(0, 2, 0, 2)];
+        }
+        else
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default7-handle"];
+            _lowerHandleImageNormal = [image imageWithAlignmentRectInsets:UIEdgeInsetsMake(-1, 8, 1, 8)];
+        }
+
     }
     
     return _lowerHandleImageNormal;
@@ -212,8 +323,18 @@
 {
     if(_lowerHandleImageHighlighted==nil)
     {
-        UIImage* image = [UIImage imageNamed:@"slider-default-handle-highlighted"];
-        _lowerHandleImageHighlighted = image;
+        if(IS_PRE_IOS7())
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default-handle-highlighted"];
+            _lowerHandleImageHighlighted = image;
+            _lowerHandleImageHighlighted = [image imageWithAlignmentRectInsets:UIEdgeInsetsMake(0, 2, 0, 2)];
+
+        }
+        else
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default7-handle"];
+            _lowerHandleImageHighlighted = [image imageWithAlignmentRectInsets:UIEdgeInsetsMake(-1, 8, 1, 8)];
+        }
     }
     
     return _lowerHandleImageHighlighted;
@@ -223,8 +344,17 @@
 {
     if(_upperHandleImageNormal==nil)
     {
-        UIImage* image = [UIImage imageNamed:@"slider-default-handle"];
-        _upperHandleImageNormal = image;
+        if(IS_PRE_IOS7())
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default-handle"];
+            _upperHandleImageNormal = [image imageWithAlignmentRectInsets:UIEdgeInsetsMake(0, 2, 0, 2)];
+
+        }
+        else
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default7-handle"];
+            _upperHandleImageNormal = [image imageWithAlignmentRectInsets:UIEdgeInsetsMake(-1, 8, 1, 8)];
+        }
     }
     
     return _upperHandleImageNormal;
@@ -234,8 +364,16 @@
 {
     if(_upperHandleImageHighlighted==nil)
     {
-        UIImage* image = [UIImage imageNamed:@"slider-default-handle-highlighted"];
-        _upperHandleImageHighlighted = image;
+        if(IS_PRE_IOS7())
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default-handle-highlighted"];
+            _upperHandleImageHighlighted = [image imageWithAlignmentRectInsets:UIEdgeInsetsMake(0, 2, 0, 2)];
+        }
+        else
+        {
+            UIImage* image = [UIImage imageNamed:@"slider-default7-handle"];
+            _upperHandleImageHighlighted = [image imageWithAlignmentRectInsets:UIEdgeInsetsMake(-1, 8, 1, 8)];
+        }
     }
     
     return _upperHandleImageHighlighted;
@@ -273,26 +411,63 @@
     return value;
 }
 
+- (UIEdgeInsets) trackAlignmentInsets
+{
+    UIEdgeInsets lowerAlignmentInsets = self.lowerHandleImageNormal.alignmentRectInsets;
+    UIEdgeInsets upperAlignmentInsets = self.upperHandleImageNormal.alignmentRectInsets;
+    
+    CGFloat lowerOffset = MAX(lowerAlignmentInsets.right, upperAlignmentInsets.left);
+    CGFloat upperOffset = MAX(upperAlignmentInsets.right, lowerAlignmentInsets.left);
+    
+    CGFloat leftOffset = MAX(lowerOffset, upperOffset);
+    CGFloat rightOffset = leftOffset;
+    CGFloat topOffset = lowerAlignmentInsets.top;
+    CGFloat bottomOffset = lowerAlignmentInsets.bottom;
+    
+    return UIEdgeInsetsMake(topOffset, leftOffset, bottomOffset, rightOffset);
+}
+
+
 //returns the rect for the track image between the lower and upper values based on the trackimage object
 - (CGRect)trackRect
 {
     CGRect retValue;
     
-    retValue.size = CGSizeMake(_trackImage.size.width, _trackImage.size.height);
+    UIImage* currentTrackImage = [self trackImageForCurrentValues];
     
-    if(_trackImage.capInsets.top || _trackImage.capInsets.bottom)
+    retValue.size = CGSizeMake(currentTrackImage.size.width, currentTrackImage.size.height);
+    
+    if(currentTrackImage.capInsets.top || currentTrackImage.capInsets.bottom)
     {
         retValue.size.height=self.bounds.size.height;
     }
 
-    //float xLowerValue = ((self.bounds.size.width - _lowerHandle.frame.size.width) * (_lowerValue - _minimumValue) / (_maximumValue - _minimumValue))+(_lowerHandle.frame.size.width/2.0f);
+    float lowerHandleWidth = _lowerHandleHidden ? _lowerHandleHiddenWidth : _lowerHandle.frame.size.width;
+    float upperHandleWidth = _upperHandleHidden ? _upperHandleHiddenWidth : _upperHandle.frame.size.width;
+    
     float xLowerValue = 1;
-    float xUpperValue = ((self.bounds.size.width - _upperHandle.frame.size.width) * (_upperValue - _minimumValue) / (_maximumValue - _minimumValue))+(_upperHandle.frame.size.width/2.0f);
+    //float xLowerValue = ((self.bounds.size.width - lowerHandleWidth) * (_lowerValue - _minimumValue) / (_maximumValue - _minimumValue))+(lowerHandleWidth/2.0f);
+    float xUpperValue = ((self.bounds.size.width - upperHandleWidth) * (_upperValue - _minimumValue) / (_maximumValue - _minimumValue))+(upperHandleWidth/2.0f);
     
     retValue.origin = CGPointMake(xLowerValue, (self.bounds.size.height/2.0f) - (retValue.size.height/2.0f));
     retValue.size.width = xUpperValue-xLowerValue;
 
+    UIEdgeInsets alignmentInsets = [self trackAlignmentInsets];
+    retValue = UIEdgeInsetsInsetRect(retValue,alignmentInsets);
+    
     return retValue;
+}
+
+- (UIImage*) trackImageForCurrentValues
+{
+    if(self.lowerValue <= self.upperValue)
+    {
+        return self.trackImage;
+    }
+    else
+    {
+        return self.trackCrossedOverImage;
+    }
 }
 
 //returns the rect for the background image
@@ -300,7 +475,7 @@
 {
     CGRect trackBackgroundRect;
     
-    trackBackgroundRect.size = CGSizeMake(_trackBackgroundImage.size.width-4, _trackBackgroundImage.size.height);
+    trackBackgroundRect.size = CGSizeMake(_trackBackgroundImage.size.width, _trackBackgroundImage.size.height);
     
     if(_trackBackgroundImage.capInsets.top || _trackBackgroundImage.capInsets.bottom)
     {
@@ -309,10 +484,15 @@
     
     if(_trackBackgroundImage.capInsets.left || _trackBackgroundImage.capInsets.right)
     {
-        trackBackgroundRect.size.width=self.bounds.size.width-4;
+        trackBackgroundRect.size.width=self.bounds.size.width;
     }
     
-    trackBackgroundRect.origin = CGPointMake(2, (self.bounds.size.height/2.0f) - (trackBackgroundRect.size.height/2.0f));
+    trackBackgroundRect.origin = CGPointMake(0, (self.bounds.size.height/2.0f) - (trackBackgroundRect.size.height/2.0f));
+    
+    // Adjust the track rect based on the image alignment rects
+    
+    UIEdgeInsets alignmentInsets = [self trackAlignmentInsets];
+    trackBackgroundRect = UIEdgeInsetsInsetRect(trackBackgroundRect,alignmentInsets);
     
     return trackBackgroundRect;
 }
@@ -345,14 +525,10 @@
 
 - (void) addSubviews
 {
-    //------------------------------
-    // Track Brackground
-    self.trackBackground = [[UIImageView alloc] initWithImage:self.trackBackgroundImage];
-    self.trackBackground.frame = [self trackBackgroundRect];
     
     //------------------------------
     // Track
-    self.track = [[UIImageView alloc] initWithImage:self.trackImage];
+    self.track = [[UIImageView alloc] initWithImage:[self trackImageForCurrentValues]];
     self.track.frame = [self trackRect];
     
     //------------------------------
@@ -368,6 +544,12 @@
     self.upperHandle = [[UIImageView alloc] initWithImage:self.upperHandleImageNormal highlightedImage:self.upperHandleImageHighlighted];
     self.upperHandle.frame = [self thumbRectForValue:_upperValue image:self.upperHandleImageNormal];
     
+    //------------------------------
+    // Track Brackground
+    self.trackBackground = [[UIImageView alloc] initWithImage:self.trackBackgroundImage];
+    self.trackBackground.frame = [self trackBackgroundRect];
+    
+    
     [self addSubview:self.trackBackground];
     [self addSubview:self.track];
     [self addSubview:self.lowerHandle];
@@ -382,12 +564,33 @@
         _haveAddedSubviews=YES;
         [self addSubviews];
     }
-
+    
+    if(_lowerHandleHidden)
+    {
+        _lowerValue = _minimumValue;
+    }
+    
+    if(_upperHandleHidden)
+    {
+        _upperValue = _maximumValue;
+    }
 
     self.trackBackground.frame = [self trackBackgroundRect];
     self.track.frame = [self trackRect];
+    self.track.image = [self trackImageForCurrentValues];
+
+    // Layout the lower handle
     self.lowerHandle.frame = [self thumbRectForValue:_lowerValue image:self.lowerHandleImageNormal];
+    self.lowerHandle.image = self.lowerHandleImageNormal;
+    self.lowerHandle.highlightedImage = self.lowerHandleImageHighlighted;
+    self.lowerHandle.hidden = self.lowerHandleHidden;
+    
+    // Layoput the upper handle
     self.upperHandle.frame = [self thumbRectForValue:_upperValue image:self.upperHandleImageNormal];
+    self.upperHandle.image = self.upperHandleImageNormal;
+    self.upperHandle.highlightedImage = self.upperHandleImageHighlighted;
+    self.upperHandle.hidden= self.upperHandleHidden;
+    
 }
 
 - (CGSize)intrinsicContentSize
@@ -400,18 +603,6 @@
 #pragma mark -
 #pragma mark - Touch handling
 
-// The handle size can be a little small, so i make it a little bigger
-// TODO: Do it the correct way. I think wwdc 2012 had a video on it...
-- (CGRect) touchRectForHandle:(UIImageView*) handleImageView
-{
-    float xPadding = 5;
-    float yPadding = 5; //(self.bounds.size.height-touchRect.size.height)/2.0f
-
-    // expands rect by xPadding in both x-directions, and by yPadding in both y-directions
-    CGRect touchRect = CGRectInset(handleImageView.frame, -xPadding, -yPadding);;
-    return touchRect;
-}
-
 -(BOOL) beginTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event
 {
     CGPoint touchPoint = [touch locationInView:self];
@@ -420,13 +611,13 @@
     //Check both buttons upper and lower thumb handles because
     //they could be on top of each other.
     
-    if(CGRectContainsPoint([self touchRectForHandle:_lowerHandle], touchPoint))
+    if(CGRectContainsPoint(UIEdgeInsetsInsetRect(_lowerHandle.frame, self.lowerTouchEdgeInsets), touchPoint))
     {
         _lowerHandle.highlighted = YES;
         _lowerTouchOffset = touchPoint.x - _lowerHandle.center.x;
     }
     
-    if(CGRectContainsPoint([self touchRectForHandle:_upperHandle], touchPoint))
+    if(CGRectContainsPoint(UIEdgeInsetsInsetRect(_upperHandle.frame, self.upperTouchEdgeInsets), touchPoint))
     {
         _upperHandle.highlighted = YES;
         _upperTouchOffset = touchPoint.x - _upperHandle.center.x;
